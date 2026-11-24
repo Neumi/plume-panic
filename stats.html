@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plume Panic stats</title>
+  <!-- Your Plume Panic stats: the runs recorded in this browser (js/local.js), nothing else. -->
+  <style>
+    :root { --ink: #e6f4ff; --dim: #8fb3c9; --muted: #5d7f93; --amber: #ffb13b; --cyan: #4fe3ff; --bg: #031822; --card: #06222f; --line: #ffffff14;
+      --s1: #1d97b4; --s2: #c6761f; /* chart series: validated pair (dark surface) */ }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(ellipse at top, #0a3346, var(--bg) 60%); background-color: var(--bg); color: var(--ink);
+      font: 15px/1.45 system-ui, -apple-system, sans-serif; min-height: 100vh; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+    h1 { margin: 0; font-size: 28px; letter-spacing: .02em; }
+    h1 span { color: var(--cyan); }
+    h2 { font-size: 15px; color: var(--dim); font-weight: 600; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .sub { color: var(--dim); font-size: 13px; margin: 4px 0 22px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .tile { background: var(--card); border: 1px solid #4fe3ff22; border-radius: 14px; padding: 12px 14px; }
+    .tile .v { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .tile .k { color: var(--dim); font-size: 13px; }
+    .tile .s { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .panel { background: var(--card); border: 1px solid #4fe3ff22; border-radius: 14px; padding: 14px; margin-bottom: 18px; }
+    .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+    .grid3 .panel { margin: 0; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+    th { color: var(--dim); font-weight: 600; font-size: 12px; text-align: left; padding: 6px; border-bottom: 1px solid #ffffff22; white-space: nowrap;
+      cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--card); }
+    th.on::after { content: " ▾"; color: var(--cyan); }
+    td { padding: 6px; border-bottom: 1px solid var(--line); }
+    .n { text-align: right; white-space: nowrap; }
+    .who { font-weight: 600; }
+    .scroll { max-height: 70vh; overflow: auto; scrollbar-width: thin; scrollbar-color: #4fe3ff55 transparent; }
+    .bar-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; margin-bottom: 7px; font-size: 13px; }
+    .bar-row .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bar-row .c { color: var(--dim); font-variant-numeric: tabular-nums; }
+    .bar-row .b { grid-column: 1 / -1; height: 6px; border-radius: 0 4px 4px 0; background: var(--cyan); opacity: .8; min-width: 2px; }
+    .chart { position: relative; }
+    .chart svg { display: block; width: 100%; height: 190px; }
+    .chart .axis { fill: var(--muted); font-size: 11px; }
+    .chart .grid { stroke: var(--line); }
+    .chart rect.s1 { fill: var(--s1); }
+    .chart rect.s2 { fill: var(--s2); }
+    .chart rect.hit { fill: transparent; }
+    .chart g:hover rect.s1, .chart g:hover rect.s2 { filter: brightness(1.35); }
+    .keys { display: flex; gap: 16px; flex-wrap: wrap; color: var(--dim); font-size: 12px; margin: -2px 0 6px; }
+    .keys i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+    .tip { position: absolute; pointer-events: none; background: #021219; border: 1px solid #4fe3ff55; border-radius: 8px; padding: 6px 9px;
+      font-size: 12px; white-space: nowrap; transform: translate(-50%, -100%); display: none; }
+    .tip b { color: var(--ink); }
+    .tip span { color: var(--dim); }
+    .empty { color: var(--muted); font-size: 13px; }
+    .legend { color: var(--dim); font-size: 12px; margin-top: 4px; }
+    a { color: var(--cyan); }
+    .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    button.clear { background: none; border: 1px solid #ffffff33; color: var(--dim); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+    button.clear:hover { border-color: var(--amber); color: var(--amber); }
+    @media (max-width: 640px) { .hide-m { display: none; } .tile .v { font-size: 22px; } h1 { font-size: 22px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Plume Panic <span>stats</span></h1>
+  <div class="sub" id="sub">Loading…</div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="panel">
+    <h2 id="days-title">Runs per day</h2>
+    <div class="chart" id="chart"><div class="tip"></div></div>
+    <div class="legend">Hover a day for details.</div>
+  </section>
+
+  <section class="panel">
+    <h2>Time of day</h2>
+    <div class="chart" id="hours"><div class="tip"></div></div>
+    <div class="legend" id="hours-note">All runs, in your local time.</div>
+  </section>
+
+  <section class="panel">
+    <h2>Names on this device</h2>
+    <div class="scroll"><table id="players"></table></div>
+  </section>
+
+  <div class="grid3">
+    <section class="panel"><h2>What ended the runs</h2><div id="why"></div></section>
+    <section class="panel"><h2>Seafloors played</h2><div id="seafloors"></div></section>
+    <section class="panel"><h2>Most seen</h2><div id="seen"></div></section>
+  </div>
+
+  <div class="sub foot" style="margin-top:18px"><a href="index.html">← play Plume Panic</a>
+    <button class="clear" id="clear" title="Deletes the high scores and all recorded runs in this browser">Delete all scores and stats</button></div>
+</main>
+<script src="js/local.js"></script>
+<script>
+(() => {
+const { allRuns, clearAll, topScores } = window.DeepRun.local;
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const num = (n) => Math.round(n || 0).toLocaleString("en");
+const km = (m) => `${((m || 0) / 1000).toLocaleString("en", { maximumFractionDigits: 1 })} km`;
+const dur = (s) => { // 3 h 12 min, 12 min, 40 s
+  s = Math.round(s || 0);
+  if (s < 60) return `${s} s`;
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`;
+};
+const date = (iso) => iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "–";
+const ago = (iso) => {
+  if (!iso) return "–";
+  const m = (Date.now() - new Date(iso)) / 60000;
+  if (m < 2) return "just now";
+  if (m < 60) return `${Math.round(m)} min ago`;
+  if (m < 48 * 60) return `${Math.round(m / 60)} h ago`;
+  return date(iso);
+};
+
+function tiles(d) {
+  const t = [
+    [num(d.runs), "runs", d.runs ? `${dur(d.seconds / d.runs)} per run · since ${date(d.since)}` : ""],
+    [dur(d.seconds), "time played", "diving time"],
+    [km(d.distance), "dived in total", ""],
+    [num(d.items), "things collected", ""],
+    [d.best ? num(d.best.score) : "–", "best score", d.best ? `by ${d.best.name}` : ""],
+    [d.longest ? `${num(d.longest)} m` : "–", "longest run", ""],
+  ];
+  $("tiles").replaceChildren(...t.map(([v, k, s]) => el("div", { className: "tile" }, el("div", { className: "v", textContent: v }), el("div", { className: "k", textContent: k }), el("div", { className: "s", textContent: s }))));
+}
+
+// bars: [{label, values: [s1, s2], tip: [line, line]}]; labels: every n-th bar gets its label under it
+function bars2(box, bars, { every, aria, fromStart = false }) {
+  const tip = box.querySelector(".tip");
+  box.querySelector("svg")?.remove();
+  const W = Math.max(280, box.clientWidth), H = 190, L = 34, B = 22, T = 8; // real pixels: labels don't stretch
+  const max = Math.max(1, ...bars.map((b) => b.values[0] + b.values[1]));
+  const step = Math.pow(10, Math.floor(Math.log10(max))), nice = Math.ceil(max / step) * step; // a round top
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", aria);
+  const mk = (parent, tag, attrs, text) => { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; parent.append(e); return e; };
+  for (const f of [0, 0.5, 1]) { // recessive grid and labels
+    const y = H - B - (H - B - T) * f;
+    mk(svg, "line", { x1: L, x2: W, y1: y, y2: y, class: "grid" });
+    mk(svg, "text", { x: L - 6, y: y + 4, "text-anchor": "end", class: "axis" }, num(nice * f));
+  }
+  const bw = (W - L) / bars.length, per = (H - B - T) / nice;
+  bars.forEach((b, i) => {
+    const x = L + i * bw, g = mk(svg, "g", {});
+    mk(g, "rect", { x, y: T, width: bw, height: H - B - T, class: "hit" });
+    let y = H - B;
+    b.values.forEach((v, k) => { // stacked, anchored to the baseline, 2px gap between segments
+      if (!v) return;
+      const h = v * per, gap = y < H - B ? 2 : 0;
+      const top = k === b.values.length - 1 || !b.values.slice(k + 1).some(Boolean);
+      mk(g, "rect", { x: x + 1, y: y - h + gap, width: Math.max(1, bw - 2), height: Math.max(1, h - gap), rx: top ? Math.min(3, h / 2) : 0, class: `s${k + 1}` });
+      y -= h;
+    });
+    g.addEventListener("mousemove", () => {
+      tip.style.display = "block";
+      tip.style.left = `${clamp(x + bw / 2, 100, W - 100)}px`;
+      tip.style.top = `${y - 6}px`;
+      tip.replaceChildren(el("b", { textContent: b.title }), ...b.tip.flatMap((t) => [el("br"), el("span", { textContent: t })]));
+    });
+    g.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+    const back = fromStart ? i : bars.length - 1 - i;
+    if (b.label && back % every === 0) mk(svg, "text", { x: i === bars.length - 1 ? W : x + bw / 2, y: H - 6, "text-anchor": i === bars.length - 1 ? "end" : "middle", class: "axis" }, b.label);
+  });
+  box.prepend(svg);
+}
+function chart(days) {
+  const box = $("chart");
+  const first = days.findIndex((d) => d.runs); // from the first day with runs (at least 14 days)
+  days = days.slice(Math.max(0, Math.min(first < 0 ? days.length : first, days.length - 14)));
+  $("days-title").textContent = `Runs per day, last ${days.length} days`;
+  bars2(box, days.map((d, i) => ({
+    values: [d.runs, 0],
+    title: new Date(d.day).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }),
+    tip: [d.runs ? `${num(d.runs)} runs · ${dur(d.seconds)} · best ${num(d.best)}` : "no runs"],
+    label: i === days.length - 1 ? "today" : new Date(d.day).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+  })), { every: days.length > 30 ? (box.clientWidth < 600 ? 14 : 7) : box.clientWidth < 600 ? 7 : 2, aria: `Runs per day for the last ${days.length} days` });
+}
+function hoursChart(local) { // 24 counts, local hours
+  const box = $("hours");
+  bars2(box, local.map((n, h) => ({
+    values: [n, 0],
+    title: `${String(h).padStart(2, "0")}:00–${String((h + 1) % 24).padStart(2, "0")}:00`,
+    tip: [`${num(n)} runs`],
+    label: String(h).padStart(2, "0"),
+  })), { every: box.clientWidth < 600 ? 4 : 2, aria: "Runs by hour of the day", fromStart: true });
+}
+
+const COLS = [ // key, header, cell, class, hide on phones
+  ["name", "Name", (p) => p.name, "who"],
+  ["seconds", "Time played", (p) => dur(p.seconds), "n"],
+  ["runs", "Runs", (p) => num(p.runs), "n"],
+  ["avg", "Per run", (p) => p.runs ? dur(p.seconds / p.runs) : "–", "n", true],
+  ["best", "Best", (p) => num(p.best), "n", true],
+  ["distance", "Distance", (p) => km(p.distance), "n", true],
+  ["first", "First dive", (p) => date(p.first), "n", true],
+  ["last", "Last dive", (p) => ago(p.last), "n"],
+];
+let sortKey = "seconds", rows = [];
+function players() {
+  const val = (p, k) => k === "avg" ? (p.runs ? p.seconds / p.runs : 0) : k === "name" ? p.name.toLowerCase() : k === "first" || k === "last" ? (p[k] || "") : p[k] || 0;
+  const sorted = [...rows].sort((a, b) => { const x = val(a, sortKey), y = val(b, sortKey); return sortKey === "name" ? (x < y ? -1 : x > y) : y > x ? 1 : y < x ? -1 : 0; });
+  const head = el("tr", {}, el("th", { className: "n", textContent: "#" }), ...COLS.map(([k, t, , c, m]) => {
+    const th = el("th", { textContent: t, className: `${c} ${m ? "hide-m" : ""} ${k === sortKey ? "on" : ""}`, title: "sort" });
+    th.onclick = () => { sortKey = k; players(); };
+    return th;
+  }));
+  const body = sorted.map((p, i) => el("tr", {}, el("td", { className: "n", textContent: i + 1 }), ...COLS.map(([, , f, c, m]) => el("td", { className: `${c} ${m ? "hide-m" : ""}`, textContent: f(p) }))));
+  if (!body.length) body.push(el("tr", {}, el("td", { colSpan: COLS.length + 1, className: "empty", textContent: "No runs recorded yet." })));
+  $("players").replaceChildren(head, ...body);
+}
+
+function bars(id, list, fmt = num) {
+  const max = Math.max(1, ...list.map(([, n]) => n));
+  $(id).replaceChildren(...(list.length ? list.map(([k, n]) => el("div", { className: "bar-row", title: k },
+    el("div", { className: "t", textContent: k }), el("div", { className: "c", textContent: fmt(n) }),
+    Object.assign(el("div", { className: "b" }), { style: `width:${(100 * n) / max}%` }))) : [el("div", { className: "empty", textContent: "Nothing yet." })]));
+}
+
+// ---------- the numbers, from the runs recorded in this browser ----------
+const DAYS = 60;
+const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const bump = (o, k, by = 1) => { o[k] = (o[k] || 0) + by; };
+const top = (o, n) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n);
+
+function summary() {
+  const runs = allRuns();
+  const d = { runs: runs.length, seconds: 0, distance: 0, items: 0, longest: 0, since: runs[0]?.time, best: topScores()[0] || null };
+  const days = {}, hours = Array(24).fill(0), why = {}, seafloors = {}, seen = {}, names = {};
+  for (const r of runs) {
+    const t = new Date(r.time);
+    d.seconds += r.seconds || 0; d.distance += r.distance || 0; d.items += r.items || 0;
+    d.longest = Math.max(d.longest, r.distance || 0);
+    const day = (days[dayKey(t)] ||= { runs: 0, seconds: 0, best: 0 });
+    day.runs++; day.seconds += r.seconds || 0; day.best = Math.max(day.best, r.score || 0);
+    hours[t.getHours()]++;
+    if (r.why) bump(why, r.why);
+    if (r.seafloor) bump(seafloors, r.seafloor);
+    for (const [k, n] of Object.entries(r.seen || {})) bump(seen, k, n);
+    const name = r.name || "(no name)";
+    const p = (names[name.toLowerCase()] ||= { name, runs: 0, seconds: 0, best: 0, distance: 0, items: 0, first: r.time });
+    p.name = name; p.runs++; p.seconds += r.seconds || 0; p.best = Math.max(p.best, r.score || 0);
+    p.distance += r.distance || 0; p.items += r.items || 0; p.last = r.time;
+  }
+  const today = new Date();
+  d.days = Array.from({ length: DAYS }, (_, k) => {
+    const t = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (DAYS - 1 - k));
+    const v = days[dayKey(t)] || { runs: 0, seconds: 0, best: 0 };
+    return { day: t.toISOString(), ...v };
+  });
+  return { ...d, hours, why: top(why, 10), seafloors: top(seafloors, 10), seen: top(seen, 30), table: Object.values(names) };
+}
+
+function load() {
+  const d = summary();
+  tiles(d);
+  chart(d.days);
+  hoursChart(d.hours);
+  lastHours = d.hours;
+  lastDays = d.days;
+  rows = d.table;
+  players();
+  bars("why", d.why);
+  bars("seafloors", d.seafloors);
+  bars("seen", d.seen);
+  $("sub").textContent = d.runs ? "Runs recorded in this browser only: nothing is sent anywhere." : "No runs on this device yet: go diving!";
+}
+let lastDays = null, lastHours = null, resizeT = 0;
+addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (lastDays) chart(lastDays); if (lastHours) hoursChart(lastHours); }, 150); });
+$("clear").addEventListener("click", () => {
+  if (!confirm("Delete all Plume Panic high scores and stats in this browser? This can't be undone.")) return;
+  clearAll();
+  load();
+});
+load();
+addEventListener("storage", load); // a run finished in another tab
+})();
+</script>
+</body>
+</html>
